@@ -1,0 +1,1309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Orbit Rescue</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;padding:0;height:100%;background:#05060e;overflow:hidden}
+  body{display:flex;align-items:center;justify-content:center;font-family:'Press Start 2P',monospace;color:#e8ecff}
+  #game{display:block;background:#05060e;cursor:crosshair}
+  .screen{position:fixed;left:0;top:0;width:1280px;height:720px;transform-origin:0 0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:22px;text-align:center;z-index:10;background:rgba(3,4,14,.5)}
+  #menuScreen{display:block;background:radial-gradient(circle at 50% 50%,rgba(3,4,14,0) 0 110px,rgba(3,4,14,.55) 111px)}
+  #menuScreen .logo{position:absolute;top:44px;left:0;right:0}
+  #menuScreen .tag{position:absolute;top:212px;left:0;right:0}
+  #menuScreen .panel{position:absolute;left:100px;top:278px;width:340px;box-sizing:border-box}
+  #menuScreen .side{position:absolute;right:100px;top:300px;width:360px;display:flex;flex-direction:column;align-items:center}
+  #menuScreen .howto{position:absolute;bottom:40px;left:0;right:0}
+  .hidden{display:none!important}
+  .logo{font-size:52px;line-height:1.25;letter-spacing:6px;margin:0;color:#7fe7ff;
+    text-shadow:4px 4px 0 #1d4f8a,8px 8px 0 #0a1030}
+  .logo span{color:#ffb03b;text-shadow:4px 4px 0 #8a4a10,8px 8px 0 #0a1030}
+  .tag{font-size:12px;color:#9fb6e8;letter-spacing:2px}
+  .panel{background:#0a0f2a;border:4px solid #2c3f86;padding:18px 26px;min-width:320px;
+    box-shadow:inset 0 4px 0 rgba(120,160,255,.18),6px 6px 0 #000}
+  .ptitle{font-size:12px;color:#ffb03b;margin-bottom:12px;letter-spacing:2px}
+  .hs{font-size:32px;color:#fff;text-shadow:3px 3px 0 #2c3f86;margin-bottom:16px}
+  ol{list-style:none;margin:0;padding:0;font-size:12px;color:#9fb6e8}
+  ol li{display:flex;justify-content:space-between;padding:4px 0}
+  ol li b{color:#dfe9ff;font-weight:normal}
+  ol li.empty{justify-content:center;color:#5c6a99}
+  .bar{width:360px;height:28px;border:4px solid #7fe7ff;padding:4px;box-sizing:border-box;margin:0 auto 12px}
+  #loadFill{height:100%;width:0;background:repeating-linear-gradient(90deg,#7fe7ff 0 12px,transparent 12px 16px)}
+  #loadMsg{font-size:10px;color:#7fe7ff}
+  .pbtn{font-family:inherit;font-size:16px;padding:16px 26px;border:0;cursor:pointer;color:#1a1030;letter-spacing:2px;
+    background:#ffb03b;box-shadow:inset -4px -4px 0 #b8600f,inset 4px 4px 0 #ffe0a0,6px 6px 0 #000}
+  .pbtn:hover{background:#ffc45e}
+  .pbtn:active{transform:translate(3px,3px);box-shadow:inset -4px -4px 0 #b8600f,inset 4px 4px 0 #ffe0a0,3px 3px 0 #000}
+  .pbtn.alt{background:#7fe7ff;box-shadow:inset -4px -4px 0 #2a7fa8,inset 4px 4px 0 #d8f8ff,6px 6px 0 #000}
+  .pbtn.alt:hover{background:#a8f0ff}
+  .hint{font-size:10px;color:#8fa0c8;margin-top:14px;animation:blink 1s infinite}
+  @keyframes blink{0%,49%{opacity:1}50%,100%{opacity:0}}
+  .howto{font-size:10px;color:#8fa0c8;line-height:2.2}
+  .howto b{color:#ffe27a;font-weight:normal}
+  #endScreen h2{font-size:40px;margin:0;letter-spacing:4px}
+  #endScreen.win h2{color:#46ff8c;text-shadow:4px 4px 0 #0f6a3a,8px 8px 0 #000}
+  #endScreen.lose h2{color:#ff4048;text-shadow:4px 4px 0 #7a1020,8px 8px 0 #000}
+  .badge{font-size:14px;color:#1a1030;background:#ffe27a;padding:10px 14px;box-shadow:4px 4px 0 #000;animation:blink .8s infinite}
+  .stats .row{display:flex;justify-content:space-between;gap:40px;font-size:12px;padding:6px 0;color:#9fb6e8}
+  .stats .row b{color:#fff;font-weight:normal}
+  .btnrow{display:flex;gap:22px}
+</style>
+</head>
+<body>
+<canvas id="game" width="1280" height="720"></canvas>
+
+<!-- Loading page / main menu: high score + new game -->
+<div id="menuScreen" class="screen">
+  <h1 class="logo">ORBIT<br><span>RESCUE</span></h1>
+  <div class="tag">DEBRIS FIELD INBOUND &middot; 60 SECONDS &middot; SAVE EARTH</div>
+  <div class="panel">
+    <div class="ptitle">HIGH SCORE</div>
+    <div class="hs" id="hsBig">0</div>
+    <ol id="topList"></ol>
+  </div>
+  <div class="side">
+    <div id="loadBox">
+      <div class="bar"><div id="loadFill"></div></div>
+      <div id="loadMsg">&gt; BOOTING...</div>
+    </div>
+    <div id="menuBtns" class="hidden">
+      <button id="btnNew" class="pbtn">NEW GAME</button>
+      <div class="hint">PRESS ENTER</div>
+    </div>
+  </div>
+  <div class="howto">
+    <b>CLICK</b> A ROCK &middot; <b>DRAG</b> TO AIM &middot; <b>RELEASE</b> TO FIRE<br>
+    <b>SMASH</b> ROCKS INTO EACH OTHER TO DEFLECT THEM<br>
+    END WITH 2 OR FEWER THREATS TO WIN
+  </div>
+</div>
+
+<div id="endScreen" class="screen hidden">
+  <h2 id="endTitle">EARTH SAVED</h2>
+  <div id="newHs" class="badge hidden">NEW HIGH SCORE!</div>
+  <div class="panel stats">
+    <div class="row"><span>SCORE</span><b id="endScore"></b></div>
+    <div class="row"><span>SAVED</span><b id="endSaved"></b></div>
+    <div class="row"><span>DEFLECTS</span><b id="endStrikes"></b></div>
+    <div class="row"><span>EARTH</span><b id="endEarth"></b></div>
+    <div class="row"><span>FUEL</span><b id="endFuel"></b></div>
+    <div class="row"><span>HIGH SCORE</span><b id="endBest"></b></div>
+  </div>
+  <div class="btnrow">
+    <button id="btnAgain" class="pbtn">PLAY AGAIN</button>
+    <button id="btnMenu" class="pbtn alt">MENU</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ============================================================
+ * §1 Config — all tunable constants live here
+ * ==========================================================*/
+const W = 1280, H = 720;                 // logical canvas size
+const CX = W / 2, CY = H / 2;            // Earth center
+const HALF_DIAG = Math.hypot(W, H) / 2;  // ~739
+const PX = 3;                            // pixel-art scale (world px per art pixel)
+const BW = Math.ceil(W / PX), BH = Math.ceil(H / PX); // low-res framebuffer
+const DT = 1 / 120;                      // fixed physics step (s)
+const PRED_DT = 1 / 60;                  // background classification step (s)
+const PRED_TIME = 10;                    // prediction horizon (s)
+const DRAG_PRED_TIME = 8;                // drawn drag preview horizon (s)
+const G = 900000;                        // gravity constant (px^3/s^2)
+const SOFT2 = 60 * 60;                   // gravity softening^2
+const EARTH_R = 48;                      // Earth radius (world px)
+const hitR = d => EARTH_R + d.r * 0.6;   // impact distance for a piece
+const AMBER_K = 1.6;                     // near-miss threshold = hitR * AMBER_K
+const DEBRIS_VIS = 1.5;                  // visual & rock-vs-rock radius = r * DEBRIS_VIS
+const RESTITUTION = 0.85;                // rock-vs-rock bounciness
+const MAX_DV = 110;                      // max delta-v per nudge (px/s)
+const DRAG_K = 1.0;                      // px dragged -> dv factor
+const MAX_COST = 25;                     // fuel cost of a full nudge
+const FUEL_MAX = 100, HULL_MAX = 100;
+const GAME_TIME = 60;                    // seconds
+const SLOWMO = 0.15;                     // timeScale while dragging
+const TRAIL_LEN = 70;
+const WAVE_TIMES = [0, 15, 30, 45];
+const ESCAPE_D = HALF_DIAG * 1.5;        // "left the world" distance
+const SPAWN_R0 = 300, SPAWN_R1 = 400;    // on-screen spawn ring
+const SPAWN_MARGIN = 80;                 // keep spawns inside canvas, clear of HUD panels
+const CLASSIFY_PERIOD = 0.25;            // staggered re-eval interval
+const EARTH_SPIN = 0.15, EARTH_TILT = 0.41;
+
+// Palette
+const C = {
+  white: [255, 255, 255], red: [255, 64, 72], redD: [120, 20, 36],
+  amber: [255, 176, 59], amberD: [130, 74, 18], green: [70, 255, 140], greenD: [18, 110, 62],
+  cyan: [127, 231, 255], cyanD: [46, 120, 170], yellow: [255, 226, 122],
+  orange: [255, 122, 50], smoke: [96, 96, 110],
+};
+const DANGER = { red: { c: C.red, d: C.redD }, amber: { c: C.amber, d: C.amberD }, green: { c: C.green, d: C.greenD } };
+
+/* ============================================================
+ * §2 Utils (math, seeded noise, ordered dither)
+ * ==========================================================*/
+const TAU = Math.PI * 2;
+const rand = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const hypot = Math.hypot;
+const css = c => 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')';
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function hash3(x, y, z, s) {
+  let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(z, 1440662683) + Math.imul(s, 144665)) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+function vnoise3(x, y, z, s) {
+  const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+  const xf = x - xi, yf = y - yi, zf = z - zi;
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf), w = zf * zf * (3 - 2 * zf);
+  const l = (a, b, t) => a + (b - a) * t;
+  const h = (dx, dy, dz) => hash3(xi + dx, yi + dy, zi + dz, s);
+  return l(l(l(h(0, 0, 0), h(1, 0, 0), u), l(h(0, 1, 0), h(1, 1, 0), u), v),
+           l(l(h(0, 0, 1), h(1, 0, 1), u), l(h(0, 1, 1), h(1, 1, 1), u), v), w);
+}
+function fbm3(x, y, z, s, oct) {
+  let sum = 0, amp = 0.5, f = 1, norm = 0;
+  for (let o = 0; o < oct; o++) {
+    sum += amp * vnoise3(x * f, y * f, z * f, s + o * 17);
+    norm += amp; amp *= 0.5; f *= 2;
+  }
+  return sum / norm;
+}
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v + 0.5) / 16);
+const bay = (x, y) => BAYER[((y & 3) << 2) | (x & 3)];
+
+/* ============================================================
+ * §3 Physics — ONE step function shared by live sim & prediction
+ * ==========================================================*/
+// Semi-implicit Euler with softened inverse-square gravity. state = {x,y,vx,vy}, center-relative.
+function step(s, dt) {
+  const r2 = Math.max(s.x * s.x + s.y * s.y, SOFT2);
+  const k = -G / (r2 * Math.sqrt(r2));
+  s.vx += k * s.x * dt; s.vy += k * s.y * dt;
+  s.x += s.vx * dt; s.y += s.vy * dt;
+}
+// Rock-vs-rock contact (circles of radius r * DEBRIS_VIS, mass ~ r^2)
+function overlapping(a, b) {
+  const s = (a.r + b.r) * DEBRIS_VIS, dx = b.x - a.x, dy = b.y - a.y;
+  return dx * dx + dy * dy < s * s;
+}
+// Separates the pair and applies an elastic-ish impulse. Returns impact speed (0 if separating).
+function resolvePair(a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y, dist = hypot(dx, dy) || 0.001;
+  const nx = dx / dist, ny = dy / dist, ma = a.r * a.r, mb = b.r * b.r;
+  const overlap = (a.r + b.r) * DEBRIS_VIS - dist;
+  if (overlap > 0) {
+    const ta = overlap * mb / (ma + mb), tb = overlap * ma / (ma + mb);
+    a.x -= nx * ta; a.y -= ny * ta; b.x += nx * tb; b.y += ny * tb;
+  }
+  const vn = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+  if (vn >= 0) return 0;
+  const j = -(1 + RESTITUTION) * vn / (1 / ma + 1 / mb);
+  a.vx -= j * nx / ma; a.vy -= j * ny / ma;
+  b.vx += j * nx / mb; b.vy += j * ny / mb;
+  return -vn;
+}
+
+/* ============================================================
+ * §4 Entities
+ * ==========================================================*/
+let debris = [], particles = [], stars = [], satellite = null, fx = [];
+
+function makeDebris(idx, tangFrac, radFrac) {
+  // spawn on-screen: random point on ring, resampled until inside canvas
+  let x, y, tries = 0;
+  do {
+    const a = rand(0, TAU), r = rand(SPAWN_R0, SPAWN_R1);
+    x = CX + Math.cos(a) * r; y = CY + Math.sin(a) * r; tries++;
+  } while ((Math.abs(x - CX) > W / 2 - SPAWN_MARGIN ||
+            Math.abs(y - CY) > H / 2 - SPAWN_MARGIN) && tries < 50);
+  // mostly-tangential velocity with an inward radial component
+  const rx = x - CX, ry = y - CY;
+  const rr = hypot(rx, ry), cs = Math.sqrt(G / rr); // circular orbit speed
+  const ux = rx / rr, uy = ry / rr;
+  const sgn = Math.random() < 0.5 ? 1 : -1;
+  const vx = -uy * sgn * cs * tangFrac - ux * cs * radFrac;
+  const vy =  ux * sgn * cs * tangFrac - uy * cs * radFrac;
+  const r = rand(5, 14);
+  // irregular outline: per-vertex radius multipliers, evenly spaced in angle
+  const ks = [];
+  for (let i = 0, nv = 7 + Math.floor(rand(0, 4)); i < nv; i++) ks.push(rand(0.7, 1.2));
+  // craters in the rock's own frame (world units)
+  const craters = [];
+  for (let i = 0, n = 2 + Math.floor(rand(0, 2)); i < n; i++) {
+    const a = rand(0, TAU), dd = rand(0.1, 0.55) * r * DEBRIS_VIS;
+    craters.push({ x: Math.cos(a) * dd, y: Math.sin(a) * dd, r: rand(0.18, 0.32) * r * DEBRIS_VIS });
+  }
+  return {
+    idx, x: rx, y: ry, vx, vy, r, ks, craters, rot: rand(0, TAU), rotV: rand(-1.5, 1.5),
+    trail: [], danger: 'amber', dangerChecked: false, classifyAt: idx * CLASSIFY_PERIOD / 14,
+    alive: true, wasGreen: false, closest: Infinity, nudged: false, strikePending: false,
+  };
+}
+
+function makeSatellite() {
+  return { x: CX + 160, y: CY - 120, tx: CX + 160, ty: CY - 120, flame: 0, flameAng: 0 };
+}
+
+function burst(x, y, n, cols, s0, s1) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU), s = rand(s0, s1);
+    particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+                     life: rand(0.3, 0.9), t: 0, col: pick(cols), size: rand(1, 3.5) });
+  }
+}
+// Directional particle cone (satellite exhaust, embers, etc.)
+function coneBurst(x, y, ang, spread, n, col, spd, life) {
+  for (let i = 0; i < n; i++) {
+    const a = ang + rand(-spread, spread), s = rand(spd * 0.4, spd);
+    particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+                     life: rand(life * 0.6, life), t: 0, col, size: rand(1, 2.4) });
+  }
+}
+// fx overlays: expanding rings, shockwaves (pixel layer) and floating text (HUD layer)
+function fxRing(x, y, r0, r1, col, life) { fx.push({ type: 'ring', x, y, r0, r1, col, t: 0, life }); }
+function fxText(x, y, str, col) { fx.push({ type: 'text', x, y, str, col, t: 0, life: 1.0 }); }
+
+/* ============================================================
+ * §5 Safety prediction — uses the SAME step() as the live sim
+ * ==========================================================*/
+// Single-body lookahead: returns {hit, escaped, closest}
+function predict(d, vx, vy, horizon, dt) {
+  const s = { x: d.x, y: d.y, vx, vy };
+  let closest = Infinity, hit = false, escaped = false;
+  const steps = Math.round(horizon / dt), hr = hitR(d);
+  for (let i = 0; i < steps; i++) {
+    step(s, dt);
+    const r = hypot(s.x, s.y);
+    if (r < closest) closest = r;
+    if (r < hr) { hit = true; closest = r; break; }
+    if (r > ESCAPE_D && (s.x * s.vx + s.y * s.vy) > 0) { escaped = true; break; }
+  }
+  return { hit, escaped, closest };
+}
+
+function classify(d, vx, vy) {
+  const p = predict(d, vx, vy, PRED_TIME, PRED_DT);
+  d.closest = p.closest;
+  if (p.hit) return 'red';
+  if (p.escaped || isGone(d)) return 'green';            // exits the world within horizon
+  if (p.closest >= hitR(d) * AMBER_K) return 'green';    // clears Earth
+  return 'amber';                                         // near miss
+}
+// Removed-piece check: far outside world & receding -> "saved"
+function isGone(d) {
+  return hypot(d.x, d.y) > ESCAPE_D && (d.x * d.vx + d.y * d.vy) > 0;
+}
+
+// Multi-body drag preview: all rocks move together at the live DT; the aimed rock
+// may strike one other rock (same resolvePair as live), whose new path is traced too.
+function simulateDrag(locked, dv) {
+  const bodies = [];
+  let me = null;
+  for (const d of debris) {
+    if (!d.alive) continue;
+    const b = { x: d.x, y: d.y, vx: d.vx, vy: d.vy, r: d.r, src: d, done: false, hit: null, escaped: false, closest: Infinity };
+    if (d === locked) { b.vx += dv.x; b.vy += dv.y; me = b; }
+    bodies.push(b);
+  }
+  const res = { path: [], after: [], struckPath: [], contact: null, struck: null, closestPt: null,
+                meDanger: 'amber', meHit: null, struckDanger: null, struckHit: null, struckWasRed: false };
+  if (!me) return res;
+  const steps = Math.round(PRED_TIME / DT), drawSteps = Math.round(DRAG_PRED_TIME / DT);
+  for (let i = 0; i < steps; i++) {
+    const meWasDone = me.done, stWasDone = res.struck ? res.struck.done : true;
+    for (const b of bodies) if (!b.done) step(b, DT);
+    if (!res.contact && !me.done) {
+      for (const b of bodies) {
+        if (b === me || b.done || !overlapping(me, b)) continue;
+        if (resolvePair(me, b) > 0) {
+          res.contact = { x: (me.x * b.r + b.x * me.r) / (me.r + b.r), y: (me.y * b.r + b.y * me.r) / (me.r + b.r) };
+          res.struck = b; b.closest = Infinity;
+          break;
+        }
+      }
+    }
+    for (const b of bodies) {
+      if (b.done) continue;
+      const r = hypot(b.x, b.y);
+      if (r < b.closest) { b.closest = r; if (b === me) res.closestPt = { x: b.x, y: b.y }; }
+      if (r < hitR(b)) { b.done = true; b.hit = { x: b.x, y: b.y }; }
+      else if (r > ESCAPE_D && b.x * b.vx + b.y * b.vy > 0) { b.done = true; b.escaped = true; }
+    }
+    if (i < drawSteps) {
+      if (!meWasDone) (res.contact ? res.after : res.path).push({ x: me.x, y: me.y });
+      if (res.struck && !stWasDone) res.struckPath.push({ x: res.struck.x, y: res.struck.y });
+    }
+    if (me.done && (!res.struck || res.struck.done)) break;
+  }
+  const dangerOf = b => b.hit ? 'red' : (b.escaped || b.closest >= hitR(b) * AMBER_K) ? 'green' : 'amber';
+  res.meDanger = dangerOf(me); res.meHit = me.hit;
+  if (res.struck) {
+    res.struckDanger = dangerOf(res.struck); res.struckHit = res.struck.hit;
+    res.struckWasRed = res.struck.src.danger === 'red';
+  }
+  return res;
+}
+
+/* ============================================================
+ * §6 Waves
+ * ==========================================================*/
+const game = {
+  state: 'menu', // menu | play | win | lose
+  t: 0, timer: GAME_TIME, hull: HULL_MAX, fuel: FUEL_MAX,
+  saved: 0, strikes: 0, totalSpawned: 0, wave: 0, waveFlash: 0, waveFlashN: 0,
+  timeScale: 1, shake: 0, flash: 0, score: 0, acc: 0,
+};
+let totalToSpawn = 0;
+
+const WAVES = [
+  { n: 3, tf: 0.40, rf: 0.05 },  // wave 1: slow grazing arcs, one-medium-nudge fixable
+  { n: 3, tf: 0.20, rf: 0.35 },
+  { n: 4, tf: 0.20, rf: 0.40 },
+  { n: 4, tf: 0.15, rf: 0.50 },
+];
+
+function spawnWave(i) {
+  const wv = WAVES[i];
+  for (let k = 0; k < wv.n; k++) {
+    const d = makeDebris(debris.length, wv.tf * rand(0.9, 1.1), wv.rf * rand(0.9, 1.1));
+    debris.push(d); game.totalSpawned++;
+  }
+  game.wave = i + 1;
+  game.waveFlash = 1.6; game.waveFlashN = i + 1;
+}
+// ---- END OF PURE SIMULATION CODE (sections above have no DOM access) ----
+
+/* ============================================================
+ * §7 Input / nudge
+ * ==========================================================*/
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+let scale = 1, offX = 0, offY = 0;
+const mouse = { x: CX, y: CY, down: false };
+let locked = null, lockStart = null, dragDV = { x: 0, y: 0 }, dragPreview = null;
+
+function resize() {
+  const ww = window.innerWidth, wh = window.innerHeight;
+  scale = Math.min(ww / W, wh / H);
+  canvas.style.width = (W * scale) + 'px';
+  canvas.style.height = (H * scale) + 'px';
+  const rect = canvas.getBoundingClientRect();
+  offX = rect.left; offY = rect.top;
+  // overlay screens are laid out at 1280x720 and scaled onto the canvas
+  for (const s of document.querySelectorAll('.screen')) {
+    s.style.left = rect.left + 'px'; s.style.top = rect.top + 'px';
+    s.style.transform = 'scale(' + scale + ')';
+  }
+}
+window.addEventListener('resize', resize);
+
+function toLogical(e) {
+  const cx = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
+  const cy = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
+  return { x: (cx - offX) / scale, y: (cy - offY) / scale };
+}
+
+function pointerDown(e) {
+  initAudio();
+  if (game.state !== 'play') return;
+  const p = toLogical(e);
+  mouse.x = p.x; mouse.y = p.y;
+  // pick nearest rock within pick radius (matches drawn size)
+  let best = null, bd = Infinity;
+  for (const d of debris) {
+    if (!d.alive) continue;
+    const dd = hypot(d.x + CX - p.x, d.y + CY - p.y);
+    if (dd < d.r * DEBRIS_VIS * 1.2 + 14 && dd < bd) { bd = dd; best = d; }
+  }
+  if (best) {
+    locked = best; lockStart = { x: p.x, y: p.y };
+    dragDV.x = dragDV.y = 0;
+    mouse.down = true;
+    game.timeScale = SLOWMO;
+    e.preventDefault();
+  }
+}
+function pointerMove(e) {
+  const p = toLogical(e);
+  mouse.x = p.x; mouse.y = p.y;
+  if (locked && lockStart) {
+    let dx = (p.x - lockStart.x) * DRAG_K;
+    let dy = (p.y - lockStart.y) * DRAG_K;
+    const m = hypot(dx, dy);
+    // cap dv at MAX_DV and at what fuel affords
+    const cap = Math.min(MAX_DV, game.fuel / MAX_COST * MAX_DV);
+    if (m > cap) { dx *= cap / m; dy *= cap / m; }
+    dragDV.x = dx; dragDV.y = dy;
+    if (e.cancelable && e.touches) e.preventDefault();
+  }
+}
+function pointerUp() {
+  if (locked) {
+    const m = hypot(dragDV.x, dragDV.y);
+    if (m > 1 && game.fuel > 0) {
+      locked.vx += dragDV.x; locked.vy += dragDV.y;
+      locked.nudged = true;
+      game.fuel = Math.max(0, game.fuel - m / MAX_DV * MAX_COST);
+      locked.dangerChecked = false;
+      satellite.flame = 0.4;
+      satellite.flameAng = Math.atan2(-dragDV.y, -dragDV.x); // exhaust opposite dv
+      coneBurst(satellite.x, satellite.y, satellite.flameAng, 0.5, 8, C.cyan, 160, 0.45);
+      sfxWhoosh(m / MAX_DV);
+    }
+    locked = null; lockStart = null; dragPreview = null;
+    game.timeScale = 1;
+  }
+  mouse.down = false;
+}
+canvas.addEventListener('mousedown', pointerDown);
+window.addEventListener('mousemove', pointerMove);
+window.addEventListener('mouseup', pointerUp);
+canvas.addEventListener('touchstart', pointerDown, { passive: false });
+canvas.addEventListener('touchmove', pointerMove, { passive: false });
+canvas.addEventListener('touchend', pointerUp);
+
+/* ============================================================
+ * §8 Collisions & damage
+ * ==========================================================*/
+function hitEarth(d) {
+  d.alive = false;
+  game.hull -= 10 + d.r;
+  game.flash = 1;
+  game.shake = 1;
+  const ix = CX + d.x, iy = CY + d.y;
+  burst(ix, iy, 30 + Math.floor(rand(0, 30)), [C.white, C.yellow, C.orange, C.red], 40, 320);
+  fx.push({ type: 'shock', x: ix, y: iy, t: 0, life: 0.5 });
+  scarEarth(d.x, d.y, d.r);
+  sfxBoom();
+}
+
+// Rock-vs-rock collisions: bounce, sparks, and "deflect" tracking for player-driven hits
+function resolveCollisions() {
+  for (let i = 0; i < debris.length; i++) {
+    const a = debris[i];
+    if (!a.alive) continue;
+    for (let j = i + 1; j < debris.length; j++) {
+      const b = debris[j];
+      if (!b.alive || !overlapping(a, b)) continue;
+      const spd = resolvePair(a, b);
+      if (spd > 0) onRockHit(a, b, spd);
+    }
+  }
+}
+function onRockHit(a, b, spd) {
+  const x = CX + (a.x * b.r + b.x * a.r) / (a.r + b.r), y = CY + (a.y * b.r + b.y * a.r) / (a.r + b.r);
+  burst(x, y, 6 + Math.min(20, Math.floor(spd / 8)), [C.white, C.yellow, C.amber], 30, 60 + spd);
+  fxRing(x, y, 4, 26, C.yellow, 0.3);
+  game.shake = Math.max(game.shake, Math.min(0.45, spd / 350));
+  a.dangerChecked = b.dangerChecked = false;
+  sfxClank(spd);
+  if (a.nudged || b.nudged) {
+    for (const d of [a, b]) if (d.danger === 'red') d.strikePending = true;
+    a.nudged = b.nudged = true;
+    fxText(x, y - 14, 'SMASH!', css(C.yellow));
+  }
+}
+
+/* ============================================================
+ * §9 Game state
+ * ==========================================================*/
+const $ = id => document.getElementById(id);
+
+// top-5 scores in localStorage (also keeps the legacy orbitRescueBest key)
+function loadScores() {
+  try {
+    const a = JSON.parse(localStorage.getItem('orbitRescueScores') || '[]').filter(Number.isFinite);
+    const legacy = +(localStorage.getItem('orbitRescueBest') || 0);
+    if (legacy > 0 && !a.length) a.push(legacy);
+    return a.sort((x, y) => y - x).slice(0, 5);
+  } catch (e) { return []; }
+}
+function saveScore(s) {
+  const a = loadScores(), prev = a[0] || 0;
+  if (s > 0) a.push(s);
+  a.sort((x, y) => y - x);
+  try {
+    localStorage.setItem('orbitRescueScores', JSON.stringify(a.slice(0, 5)));
+    localStorage.setItem('orbitRescueBest', Math.max(prev, s));
+  } catch (e) { /* storage optional */ }
+  return { best: Math.max(prev, s), isNew: s > prev };
+}
+function refreshScores() {
+  const a = loadScores();
+  $('hsBig').textContent = a[0] || 0;
+  $('topList').innerHTML = a.length
+    ? a.map((s, i) => '<li><span>' + (i + 1) + '.</span><b>' + s + '</b></li>').join('')
+    : '<li class="empty">NO SCORES YET</li>';
+}
+
+function resetEarth() {
+  if (earthBase) { earthMap = earthBase.slice(); earthCityLive = earthCity.slice(); }
+}
+function startGame() {
+  initAudio(); sfxUi();
+  debris = []; particles = []; fx = [];
+  locked = null; lockStart = null; dragPreview = null;
+  Object.assign(game, { state: 'play', t: 0, timer: GAME_TIME, hull: HULL_MAX,
+    fuel: FUEL_MAX, saved: 0, strikes: 0, totalSpawned: 0, wave: 0, waveFlash: 0,
+    timeScale: 1, shake: 0, flash: 0, score: 0, acc: 0, _beepT: 0, _emberT: 0 });
+  totalToSpawn = WAVES.reduce((s, w) => s + w.n, 0);
+  satellite = makeSatellite();
+  resetEarth();
+  show(null);
+}
+function toMenu() {
+  sfxUi();
+  Object.assign(game, { state: 'menu', hull: HULL_MAX, shake: 0, flash: 0, timeScale: 1 });
+  locked = null; dragPreview = null; satellite = null;
+  resetEarth(); spawnAttract(); refreshScores();
+  show('menu');
+}
+const securedNow = () => game.saved + debris.reduce((s, d) => s + (d.alive && d.danger === 'green' ? 1 : 0), 0);
+function endGame(won) {
+  game.state = won ? 'win' : 'lose';
+  locked = null; dragPreview = null; game.timeScale = 1;
+  const secured = securedNow();
+  game.score = Math.round((secured + game.strikes) * Math.max(game.hull, 0) * (1 + game.fuel / 100));
+  const { best, isNew } = saveScore(game.score);
+  $('endTitle').textContent = won ? 'EARTH SAVED' : game.hull <= 0 ? 'EARTH LOST' : 'TOO MANY THREATS';
+  $('endScreen').classList.toggle('win', won);
+  $('endScreen').classList.toggle('lose', !won);
+  $('newHs').classList.toggle('hidden', !isNew);
+  $('endScore').textContent = game.score;
+  $('endSaved').textContent = secured + ' / ' + totalToSpawn;
+  $('endStrikes').textContent = game.strikes;
+  $('endEarth').textContent = Math.max(0, Math.round(game.hull)) + '%';
+  $('endFuel').textContent = Math.round(game.fuel) + '%';
+  $('endBest').textContent = best;
+  show('end');
+  if (won) sfxWin(); else sfxLose();
+}
+function show(which) {
+  $('menuScreen').classList.toggle('hidden', which !== 'menu');
+  $('endScreen').classList.toggle('hidden', which !== 'end');
+}
+$('btnNew').addEventListener('click', startGame);
+$('btnAgain').addEventListener('click', startGame);
+$('btnMenu').addEventListener('click', toMenu);
+window.addEventListener('keydown', e => {
+  const over = game.state === 'win' || game.state === 'lose';
+  if ((e.key === 'Enter' || e.key === ' ') && ((game.state === 'menu' && loaded) || over)) {
+    e.preventDefault(); startGame();
+  } else if (e.key === 'Escape' && over) toMenu();
+});
+
+// Menu backdrop: a few rocks on calm circular orbits
+function spawnAttract() {
+  debris = []; particles = []; fx = [];
+  const n = 6;
+  for (let i = 0; i < n; i++) {
+    const d = makeDebris(i, 1, 0);
+    const a = rand(0, TAU), r = 140 + i * 42, cs = Math.sqrt(G / r);
+    d.x = Math.cos(a) * r; d.y = Math.sin(a) * r;
+    d.vx = -Math.sin(a) * cs; d.vy = Math.cos(a) * cs;
+    d.danger = ['green', 'amber', 'red'][i % 3];
+    debris.push(d);
+  }
+}
+function updateAttract(dt) {
+  for (const d of debris) {
+    step(d, dt); d.rot += d.rotV * dt;
+    d.trail.push({ x: d.x, y: d.y });
+    if (d.trail.length > TRAIL_LEN) d.trail.shift();
+  }
+}
+
+function tickFX(dt) {
+  for (const p of particles) {
+    p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt;
+    p.vx *= (1 - 1.5 * dt); p.vy *= (1 - 1.5 * dt);
+  }
+  particles = particles.filter(p => p.t < p.life);
+  for (const f of fx) f.t += dt;
+  fx = fx.filter(f => f.t < f.life);
+}
+
+function update(dt) { // dt is fixed DT; slow-mo runs fewer steps per frame
+  game.t += dt;
+  game.timer -= dt;
+  for (let i = 0; i < WAVE_TIMES.length; i++)
+    if (game.t >= WAVE_TIMES[i] && game.wave <= i) spawnWave(i);
+  if (game.waveFlash > 0) game.waveFlash -= dt;
+  if (game.flash > 0) game.flash -= dt / 0.3;
+  if (game.shake > 0) game.shake -= dt / 0.5;
+  // integrate all rocks, then resolve rock-vs-rock contacts
+  for (const d of debris) {
+    if (!d.alive) continue;
+    step(d, dt);
+    d.rot += d.rotV * dt;
+    d.trail.push({ x: d.x, y: d.y });
+    if (d.trail.length > TRAIL_LEN) d.trail.shift();
+  }
+  resolveCollisions();
+  for (const d of debris) {
+    if (!d.alive) continue;
+    if (hypot(d.x, d.y) < hitR(d)) { hitEarth(d); continue; }
+    if (isGone(d)) { // escaped -> saved
+      d.alive = false; game.saved++;
+      fxText(clamp(CX + d.x, 60, W - 60), clamp(CY + d.y, 110, H - 100), '+1 SAVED', css(C.cyan));
+      if (d.wasGreen) tone(1568, 0.15, 0.06); else sfxChime();
+      continue;
+    }
+    if (d === locked) continue; // danger comes from the multi-body drag preview
+    d.classifyAt -= dt;
+    if (d.classifyAt <= 0 || !d.dangerChecked) {
+      d.danger = classify(d, d.vx, d.vy);
+      d.dangerChecked = true;
+      d.classifyAt = CLASSIFY_PERIOD;
+      if (d.strikePending) {
+        d.strikePending = false;
+        if (d.danger !== 'red') {
+          game.strikes++;
+          fxText(CX + d.x, CY + d.y - d.r * DEBRIS_VIS - 24, 'DEFLECT!', css(C.yellow));
+          sfxDeflect();
+        }
+      }
+      if (d.danger === 'green' && !d.wasGreen) {
+        sfxChime();
+        fxRing(CX + d.x, CY + d.y, d.r * DEBRIS_VIS + 4, d.r * DEBRIS_VIS + 40, C.green, 0.5);
+        fxText(CX + d.x, CY + d.y - d.r * DEBRIS_VIS - 8, 'SAFE', css(C.green));
+      }
+      d.wasGreen = d.danger === 'green';
+    }
+  }
+  debris = debris.filter(d => d.alive);
+  if (locked && !locked.alive) { // aimed rock died mid-drag
+    locked = null; lockStart = null; dragPreview = null; game.timeScale = 1;
+  }
+  tickFX(dt);
+  // smoke & embers rising from a damaged Earth
+  if (game.hull < 60) {
+    game._emberT = (game._emberT || 0) - dt;
+    if (game._emberT <= 0) {
+      game._emberT = game.hull < 30 ? 0.18 : 0.4;
+      const a = rand(0, TAU);
+      particles.push({ x: CX + Math.cos(a) * EARTH_R, y: CY + Math.sin(a) * EARTH_R,
+                       vx: Math.cos(a) * rand(10, 30), vy: Math.sin(a) * rand(10, 30) - 12,
+                       life: rand(0.6, 1.1), t: 0, col: pick([C.orange, C.smoke, C.smoke]), size: rand(1, 3) });
+    }
+  }
+  // satellite glide (cosmetic)
+  const sat = satellite;
+  if (locked) { sat.tx = CX + locked.x; sat.ty = CY + locked.y; }
+  else {
+    const mx = mouse.x - CX, my = mouse.y - CY, mr = hypot(mx, my) || 1;
+    const rr = Math.max(mr, 120);
+    sat.tx = CX + mx / mr * rr; sat.ty = CY + my / mr * rr;
+  }
+  sat.x += (sat.tx - sat.x) * Math.min(1, 4 * dt);
+  sat.y += (sat.ty - sat.y) * Math.min(1, 4 * dt);
+  if (sat.flame > 0) sat.flame -= dt;
+  // tension beeps under 15 s
+  if (game.timer < 15 && game.timer > 0) {
+    game._beepT = (game._beepT || 0) - dt;
+    if (game._beepT <= 0) { sfxTension(game.timer); game._beepT = 1; }
+  }
+  // end conditions
+  if (game.hull <= 0) endGame(false);
+  else if (game.timer <= 0) {
+    const reds = debris.filter(d => d.danger === 'red').length;
+    endGame(reds <= 2);
+  }
+}
+
+/* ============================================================
+ * §10 Rendering — world drawn pixel-by-pixel into a low-res
+ *      framebuffer, upscaled with nearest-neighbour; HUD on top
+ * ==========================================================*/
+const buf = document.createElement('canvas');
+buf.width = BW; buf.height = BH;
+const bctx = buf.getContext('2d');
+const fb = bctx.createImageData(BW, BH), P = fb.data;
+let bg = null;       // pre-rendered dithered nebula
+let clock = 0;       // visual clock (runs in menus too; slowed during aim)
+
+function pset(x, y, c, a) {
+  x = Math.floor(x); y = Math.floor(y);
+  if (x < 0 || y < 0 || x >= BW || y >= BH) return;
+  const i = (y * BW + x) << 2;
+  if (a === undefined || a >= 1) { P[i] = c[0]; P[i + 1] = c[1]; P[i + 2] = c[2]; }
+  else if (a > 0) {
+    P[i] += (c[0] - P[i]) * a; P[i + 1] += (c[1] - P[i + 1]) * a; P[i + 2] += (c[2] - P[i + 2]) * a;
+  }
+}
+function pline(x0, y0, x1, y1, c, a) {
+  x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
+  const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+  let err = dx + dy;
+  for (let n = 0; n < 2000; n++) {
+    pset(x0, y0, c, a);
+    if (x0 === x1 && y0 === y1) break;
+    const e2 = 2 * err;
+    if (e2 >= dy) { err += dy; x0 += sx; }
+    if (e2 <= dx) { err += dx; y0 += sy; }
+  }
+}
+function pring(cx, cy, r, c, a, dash) {
+  const n = Math.max(8, Math.ceil(r * TAU));
+  let lx = null, ly = null;
+  for (let k = 0; k < n; k++) {
+    if (dash && (k % (dash * 2)) >= dash) continue;
+    const x = Math.floor(cx + Math.cos(k / n * TAU) * r), y = Math.floor(cy + Math.sin(k / n * TAU) * r);
+    if (x === lx && y === ly) continue;
+    lx = x; ly = y;
+    pset(x, y, c, a);
+  }
+}
+function xMark(p, c) { // 5x5 pixel "X" at a center-relative world point
+  const x = Math.floor((CX + p.x) / PX), y = Math.floor((CY + p.y) / PX);
+  for (let k = -2; k <= 2; k++) { pset(x + k, y + k, c); pset(x + k, y - k, c); }
+}
+function sqMark(p, c) { // hollow 5x5 square
+  const x = Math.floor((CX + p.x) / PX), y = Math.floor((CY + p.y) / PX);
+  for (let k = -2; k <= 2; k++) { pset(x + k, y - 2, c); pset(x + k, y + 2, c); pset(x - 2, y + k, c); pset(x + 2, y + k, c); }
+}
+
+// ---------- background ----------
+function makeStars() {
+  stars = [];
+  const layers = [
+    { n: 80, sp: 0.6, c: [90, 100, 140] },
+    { n: 50, sp: 1.4, c: [160, 172, 215] },
+    { n: 16, sp: 3.0, c: [235, 242, 255], big: true },
+  ];
+  for (const L of layers)
+    for (let i = 0; i < L.n; i++)
+      stars.push({ x: rand(0, BW), y: rand(0, BH), sp: L.sp, c: L.c, big: !!L.big, tw: rand(0, TAU) });
+}
+function tickStars(dt) {
+  for (const s of stars) { s.x -= s.sp * dt; if (s.x < -3) { s.x = BW + 3; s.y = rand(0, BH); } }
+}
+function drawStars() {
+  const ox = (mouse.x - CX) / PX * 0.012, oy = (mouse.y - CY) / PX * 0.012;
+  for (const s of stars) {
+    const x = s.x + ox * s.sp, y = s.y + oy * s.sp, tw = Math.sin(clock * (1 + s.sp) + s.tw);
+    if (!s.big) { pset(x, y, s.c, tw > -0.4 ? 1 : 0.4); continue; }
+    pset(x, y, s.c);
+    if (tw > 0.2) { // twinkling cross glint
+      const a = tw > 0.7 ? 0.8 : 0.45;
+      pset(x - 1, y, s.c, a); pset(x + 1, y, s.c, a); pset(x, y - 1, s.c, a); pset(x, y + 1, s.c, a);
+      if (tw > 0.85) { pset(x - 2, y, s.c, 0.3); pset(x + 2, y, s.c, 0.3); pset(x, y - 2, s.c, 0.3); pset(x, y + 2, s.c, 0.3); }
+    }
+  }
+}
+function makeNebula() {
+  const blobs = [
+    { x: 260, y: 180, r: 560, c: [80, 30, 150], k: 0.30 },   // deep purple
+    { x: 980, y: 540, r: 560, c: [16, 120, 140], k: 0.26 },  // teal
+    { x: 720, y: 120, r: 430, c: [50, 60, 170], k: 0.22 },   // indigo
+    { x: 180, y: 560, r: 380, c: [140, 40, 110], k: 0.18 },  // magenta accent
+    { x: 1100, y: 200, r: 340, c: [40, 90, 190], k: 0.18 },
+    { x: 560, y: 640, r: 300, c: [60, 30, 140], k: 0.18 },
+  ];
+  const STEP = 8, q = (v, b) => clamp(Math.floor((v + (b - 0.5) * STEP) / STEP) * STEP, 0, 255);
+  bg = new Uint8ClampedArray(BW * BH * 4);
+  for (let y = 0; y < BH; y++) for (let x = 0; x < BW; x++) {
+    const wx = (x + 0.5) * PX, wy = (y + 0.5) * PX;
+    const n = fbm3(x * 0.03, y * 0.03, 0.5, 7, 4);
+    let r = 5, g = 6, b = 16;
+    for (const o of blobs) {
+      const dd = hypot(wx - o.x, wy - o.y) / o.r;
+      if (dd >= 1) continue;
+      const f = (1 - dd) * (1 - dd) * o.k * (0.2 + 1.6 * n);
+      r += o.c[0] * f; g += o.c[1] * f; b += o.c[2] * f;
+    }
+    const v = hypot(wx - CX, wy - CY) / HALF_DIAG, m = 1 - 0.6 * v * v; // vignette
+    const bb = bay(x, y), i = (y * BW + x) << 2;
+    bg[i] = q(r * m, bb); bg[i + 1] = q(g * m, bb); bg[i + 2] = q(b * m, bb); bg[i + 3] = 255;
+  }
+  for (let k = 0; k < 500; k++) { // faint dust specks
+    const i = ((Math.floor(rand(0, BH)) * BW + Math.floor(rand(0, BW))) << 2), c = pick([[40, 48, 80], [52, 40, 84], [30, 64, 70]]);
+    bg[i] += c[0]; bg[i + 1] += c[1]; bg[i + 2] += c[2];
+  }
+}
+
+// ---------- Earth ----------
+const MAP_W = 128, MAP_H = 64;
+const T_DEEP = 0, T_SHALLOW = 1, T_GRASS = 2, T_FOREST = 3, T_DESERT = 4, T_MOUNT = 5, T_ICE = 6, T_SCORCH = 7;
+const TPAL = [ // [lit, mid, dark] per terrain
+  [[40, 96, 200], [28, 66, 150], [16, 36, 92]],       // deep ocean
+  [[64, 140, 220], [42, 100, 172], [24, 56, 108]],    // shallow ocean
+  [[98, 178, 84], [62, 128, 60], [32, 74, 42]],       // grassland
+  [[52, 132, 62], [34, 94, 48], [18, 54, 32]],        // forest
+  [[222, 192, 122], [172, 142, 88], [102, 82, 52]],   // desert
+  [[150, 132, 112], [108, 94, 82], [62, 54, 50]],     // mountains
+  [[240, 248, 255], [192, 206, 226], [112, 126, 152]],// ice
+  [[255, 140, 50], [200, 64, 30], [110, 24, 20]],     // scorched impact
+];
+const CLOUD = [[250, 252, 255], [204, 212, 228], [120, 130, 160]];
+let earthBase = null, earthMap = null, earthCity = null, earthCityLive = null, cloudMap = null;
+
+function makeEarthMap() {
+  const N = MAP_W * MAP_H, h = new Float32Array(N), dry = new Float32Array(N), cl = new Float32Array(N);
+  for (let v = 0; v < MAP_H; v++) for (let u = 0; u < MAP_W; u++) {
+    const lat = (v + 0.5) / MAP_H * Math.PI - Math.PI / 2, lon = (u + 0.5) / MAP_W * TAU;
+    const px = Math.cos(lat) * Math.cos(lon), py = Math.sin(lat), pz = Math.cos(lat) * Math.sin(lon), i = v * MAP_W + u;
+    h[i] = fbm3(px * 1.8 + 5, py * 1.8 + 5, pz * 1.8 + 5, 11, 5);
+    dry[i] = fbm3(px * 2.5 + 9, py * 2.5 + 9, pz * 2.5 + 9, 23, 3);
+    cl[i] = fbm3(px * 2.2 + 3, py * 5 + 3, pz * 2.2 + 3, 37, 5);
+  }
+  const pct = (arr, p) => { const s = Float32Array.from(arr).sort(); return s[Math.floor(p * (s.length - 1))]; };
+  const tShallow = pct(h, 0.62), tLand = pct(h, 0.70), tMount = pct(h, 0.95);
+  const tDry = pct(dry, 0.62), tWet = pct(dry, 0.35), tCloud = pct(cl, 0.70);
+  const rng = mulberry32(99);
+  earthBase = new Uint8Array(N); earthCity = new Uint8Array(N); cloudMap = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    const alat = Math.abs((Math.floor(i / MAP_W) + 0.5) / MAP_H * Math.PI - Math.PI / 2), land = h[i] >= tLand;
+    let t = h[i] < tShallow ? T_DEEP : !land ? T_SHALLOW : h[i] > tMount ? T_MOUNT
+          : (dry[i] > tDry && alat < 0.6) ? T_DESERT : dry[i] < tWet ? T_FOREST : T_GRASS;
+    if (alat > 1.28 || (alat > 1.05 && land)) t = T_ICE;
+    earthBase[i] = t;
+    earthCity[i] = land && t !== T_ICE && rng() < 0.09 ? 1 : 0;
+    cloudMap[i] = cl[i] - tCloud;
+  }
+  resetEarth();
+}
+const lonIdx = lon => ((Math.floor(lon / TAU * MAP_W) % MAP_W) + MAP_W) % MAP_W;
+const L_ = (() => { const l = hypot(-0.55, -0.42, 0.72); return [-0.55 / l, -0.42 / l, 0.72 / l]; })();
+
+function drawEarth() {
+  const ecx = CX / PX, ecy = CY / PX, R = EARTH_R / PX;
+  const rot = clock * EARTH_SPIN, crot = clock * EARTH_SPIN * 1.35;
+  const ct = Math.cos(EARTH_TILT), st = Math.sin(EARTH_TILT);
+  const dmg = 1 - clamp(game.hull, 0, HULL_MAX) / HULL_MAX;
+  const atm = [110 + 145 * dmg, 180 - 110 * dmg, 255 - 195 * dmg], atm2 = [atm[0] * 0.55, atm[1] * 0.55, atm[2] * 0.6];
+  const scorchBlink = Math.floor(clock * 4) & 1;
+  for (let py = Math.floor(ecy - R - 4); py <= Math.ceil(ecy + R + 4); py++)
+    for (let px = Math.floor(ecx - R - 4); px <= Math.ceil(ecx + R + 4); px++) {
+      const x = (px + 0.5 - ecx) / R, y = (py + 0.5 - ecy) / R, d2 = x * x + y * y, bb = bay(px, py);
+      if (d2 <= 1) {
+        const z = Math.sqrt(1 - d2);
+        let lv = x * L_[0] + y * L_[1] + z * L_[2] + (bb - 0.5) * 0.3;
+        if (z < 0.3) lv -= 0.12; // limb darkening
+        const xt = x * ct - y * st, yt = x * st + y * ct;
+        const lonA = Math.atan2(xt, z), v = clamp(Math.floor((Math.asin(clamp(yt, -1, 1)) / Math.PI + 0.5) * MAP_H), 0, MAP_H - 1);
+        const i = v * MAP_W + lonIdx(lonA + rot), t = earthMap[i];
+        const cv = cloudMap[v * MAP_W + lonIdx(lonA + crot)] + (bb - 0.5) * 0.05;
+        let col;
+        if (lv > -0.02) { // day side
+          const s = lv > 0.5 ? 0 : lv > 0.18 ? 1 : 2;
+          if (t === T_SCORCH) col = TPAL[T_SCORCH][scorchBlink && bb < 0.5 ? 0 : s];
+          else col = cv > 0 ? CLOUD[cv > 0.05 ? s : Math.min(2, s + 1)] : TPAL[t][s];
+        } else if (t === T_SCORCH) col = (bb < 0.5) !== !!scorchBlink ? [230, 90, 30] : [140, 30, 20];
+        else if (earthCityLive[i] && cv <= 0) col = bb < 0.6 ? [255, 214, 120] : [120, 90, 50]; // city lights
+        else col = cv > 0.02 ? [34, 40, 70] : t <= T_SHALLOW ? [8, 14, 40] : [16, 22, 36];
+        pset(px, py, col);
+      } else {
+        const dist = Math.sqrt(d2) * R - R, lit = (x * L_[0] + y * L_[1]) / Math.sqrt(d2);
+        if (dist < 1.2) pset(px, py, atm, lit > -0.2 ? 0.9 : 0.45);
+        else if (dist < 3.2 && bb < 0.45 * (3.2 - dist) / 2 * (lit > 0 ? 1.4 : 0.8)) pset(px, py, atm2, 0.7);
+      }
+    }
+}
+// Burn a crater into the Earth texture where a rock hit (rotates with the planet)
+function scarEarth(wx, wy, size) {
+  const len = hypot(wx, wy) || 1, x = wx / len * 0.9, y = wy / len * 0.9, z = Math.sqrt(1 - 0.81);
+  const ct = Math.cos(EARTH_TILT), st = Math.sin(EARTH_TILT);
+  const xt = x * ct - y * st, yt = x * st + y * ct;
+  const lat = Math.asin(clamp(yt, -1, 1)), u0 = lonIdx(Math.atan2(xt, z) + clock * EARTH_SPIN);
+  const v0 = clamp(Math.floor((lat / Math.PI + 0.5) * MAP_H), 0, MAP_H - 1);
+  const rr = 2 + Math.round(size / 5), ru = Math.min(MAP_W / 4, Math.ceil(rr / Math.max(0.3, Math.cos(lat))));
+  for (let dv = -rr; dv <= rr; dv++) for (let du = -ru; du <= ru; du++) {
+    const v = v0 + dv;
+    if (v < 0 || v >= MAP_H || (du / ru) ** 2 + (dv / rr) ** 2 > rand(0.6, 1)) continue;
+    const i = v * MAP_W + ((u0 + du + MAP_W) % MAP_W);
+    earthMap[i] = T_SCORCH; earthCityLive[i] = 0;
+  }
+}
+
+// ---------- rocks ----------
+const ROCK = [[168, 156, 146], [112, 104, 102], [64, 60, 68]];
+function drawTrail(d) {
+  const col = DANGER[d.danger].c, n = d.trail.length;
+  let lx = -1, ly = -1;
+  for (let i = 0; i < n; i++) {
+    const p = d.trail[i], x = Math.floor((CX + p.x) / PX), y = Math.floor((CY + p.y) / PX);
+    if (x === lx && y === ly) continue;
+    lx = x; ly = y;
+    const k = (i + 1) / n;
+    if (k < 0.25 && ((x + y) & 1)) continue; // dithered tail
+    pset(x, y, col, k > 0.75 ? 0.85 : k > 0.5 ? 0.55 : k > 0.25 ? 0.32 : 0.18);
+  }
+}
+function drawDebris(d) {
+  const cx = (CX + d.x) / PX, cy = (CY + d.y) / PX, R = d.r * DEBRIS_VIS / PX, cs = DEBRIS_VIS / PX;
+  const dc = DANGER[d.danger], rimCol = d.danger === 'red' && (Math.floor(clock * 5) & 1) ? dc.d : dc.c;
+  const n = d.ks.length, box = Math.ceil(R * 1.3) + 3, bx0 = Math.floor(cx), by0 = Math.floor(cy);
+  const cr = Math.cos(d.rot), sr = Math.sin(d.rot);
+  for (let j = -box; j <= box; j++) for (let i = -box; i <= box; i++) {
+    const X = bx0 + i, Y = by0 + j, dx = X + 0.5 - cx, dy = Y + 0.5 - cy, dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > R * 1.25 + 2.5) continue;
+    const th = ((Math.atan2(dy, dx) - d.rot) % TAU + TAU) % TAU, f = th / TAU * n, i0 = Math.floor(f) % n, fr = f - Math.floor(f);
+    const lim = (d.ks[i0] * (1 - fr) + d.ks[(i0 + 1) % n] * fr) * R;
+    if (dist <= lim) {
+      if (dist > lim - 1) { pset(X, Y, rimCol); continue; }
+      const lx = (dx * cr + dy * sr) / cs, ly = (-dx * sr + dy * cr) / cs; // rock-frame world units
+      let tone = (-dx - dy) / (R * 1.2) + (bay(X, Y) - 0.5) * 0.6;
+      tone = tone > 0.3 ? 0 : tone > -0.3 ? 1 : 2;
+      for (const c of d.craters)
+        if ((lx - c.x) ** 2 + (ly - c.y) ** 2 < c.r * c.r) { tone = Math.min(2, tone + 1); break; }
+      pset(X, Y, ROCK[tone]);
+    } else if (dist <= lim + 2 && ((X + Y) & 1) === 0) pset(X, Y, dc.d, 0.75); // dithered glow
+  }
+  if (d.danger === 'green' && game.state === 'play') pring(cx, cy, R * 1.25 + 3, dc.c, 0.55, 2);
+  if (d === locked) { // bracket reticle
+    const q = Math.round(R * 1.25 + 4) + (Math.floor(clock * 4) & 1);
+    for (const sx of [-1, 1]) for (const sy of [-1, 1])
+      for (let k = 0; k < 3; k++) {
+        pset(bx0 + sx * (q - k), by0 + sy * q, C.yellow);
+        pset(bx0 + sx * q, by0 + sy * (q - k), C.yellow);
+      }
+  }
+}
+
+// ---------- aiming preview ----------
+function drawPrediction(pv) {
+  if (!pv || !locked) return;
+  const dots = (arr, col) => {
+    for (let i = 0, n = arr.length; i < n; i += 5) {
+      const k = i / n;
+      pset((CX + arr[i].x) / PX, (CY + arr[i].y) / PX, col, k < 0.33 ? 0.95 : k < 0.66 ? 0.6 : 0.35);
+    }
+  };
+  dots(pv.path, C.cyan);
+  dots(pv.after, C.cyanD);
+  dots(pv.struckPath, C.amber);
+  if (pv.contact) xMark(pv.contact, C.yellow);
+  if (pv.meHit) xMark(pv.meHit, C.red);
+  else if (pv.closestPt) sqMark(pv.closestPt, DANGER[pv.meDanger].c);
+  if (pv.struckHit) xMark(pv.struckHit, C.red);
+  // nudge arrow
+  const x0 = (CX + locked.x) / PX, y0 = (CY + locked.y) / PX, ax = dragDV.x / DRAG_K / PX, ay = dragDV.y / DRAG_K / PX;
+  if (hypot(ax, ay) > 1.5) {
+    const tx = x0 + ax, ty = y0 + ay, ha = Math.atan2(ay, ax);
+    pline(x0, y0, tx, ty, C.yellow);
+    pline(tx, ty, tx - 4 * Math.cos(ha - 0.6), ty - 4 * Math.sin(ha - 0.6), C.yellow);
+    pline(tx, ty, tx - 4 * Math.cos(ha + 0.6), ty - 4 * Math.sin(ha + 0.6), C.yellow);
+  }
+}
+
+// ---------- satellite, particles, fx ----------
+const SAT_SPR = [
+  '.....k.....',
+  '....ddd....',
+  'bbb-sss-bbb',
+  'BBB-sSs-BBB',
+  'bbb-sss-bbb',
+];
+const SAT_COL = { d: [170, 180, 200], b: [40, 80, 190], B: [100, 150, 240], '-': [120, 130, 150], s: [222, 228, 240], S: [120, 130, 160] };
+function drawSatellite() {
+  const s = satellite;
+  if (!s) return;
+  const cx = Math.round(s.x / PX), cy = Math.round(s.y / PX);
+  if (s.flame > 0) {
+    const f = s.flame / 0.4, len = Math.round(3 + 7 * f), ca = Math.cos(s.flameAng), sa = Math.sin(s.flameAng);
+    for (let t = 0; t <= len; t++) {
+      const j = Math.random() < 0.3 ? Math.round(rand(-1, 1)) : 0;
+      pset(cx + ca * (3 + t) - sa * j, cy + sa * (3 + t) + ca * j, t < 2 ? C.white : t < len * 0.6 ? C.cyan : C.cyanD, 1 - t / len * 0.5);
+    }
+  }
+  for (let j = 0; j < SAT_SPR.length; j++) for (let i = 0; i < SAT_SPR[j].length; i++) {
+    const ch = SAT_SPR[j][i];
+    if (ch === '.') continue;
+    const col = ch === 'k' ? (Math.floor(clock * 3) & 1 ? C.white : null) : SAT_COL[ch];
+    if (col) pset(cx - 5 + i, cy - 2 + j, col);
+  }
+}
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.t / p.life < 0.5 ? 1 : 0.5, x = p.x / PX, y = p.y / PX;
+    pset(x, y, p.col, a);
+    if (p.size > 2.2) { pset(x + 1, y, p.col, a); pset(x, y + 1, p.col, a); pset(x + 1, y + 1, p.col, a); }
+  }
+}
+function drawGuideRings() {
+  const fl = clamp(game.flash, 0, 1) > 0.2;
+  pring(CX / PX, CY / PX, (EARTH_R + 8) / PX + 2, fl ? C.red : C.redD, fl ? 0.95 : 0.4, 2);
+  pring(CX / PX, CY / PX, (EARTH_R + 8) * AMBER_K / PX, C.amberD, 0.3, 2);
+}
+function drawFXWorld() {
+  for (const f of fx) {
+    const k = f.t / f.life;
+    if (f.type === 'ring') pring(f.x / PX, f.y / PX, (f.r0 + (f.r1 - f.r0) * k) / PX, f.col, k < 0.5 ? 0.9 : 0.45);
+    else if (f.type === 'shock') {
+      const r = (20 + 120 * k) / PX, col = k < 0.3 ? C.white : k < 0.6 ? C.amber : C.red;
+      pring(f.x / PX, f.y / PX, r, col, 0.9);
+      pring(f.x / PX, f.y / PX, r - 1, col, 0.45, 2);
+    }
+  }
+}
+
+// ---------- HUD (native resolution, pixel font) ----------
+function ptext(str, x, y, size, col, align) {
+  ctx.font = size + 'px "Press Start 2P", monospace';
+  ctx.textAlign = align || 'left'; ctx.textBaseline = 'top';
+  const o = Math.max(2, size / 8);
+  ctx.fillStyle = '#05060e'; ctx.fillText(str, x + o, y + o);
+  ctx.fillStyle = col; ctx.fillText(str, x, y);
+}
+function pbox(x, y, w, h, border) {
+  ctx.fillStyle = 'rgba(6,9,26,0.82)'; ctx.fillRect(x + 3, y + 3, w - 6, h - 6);
+  ctx.fillStyle = border || '#2c3f86';
+  ctx.fillRect(x + 3, y, w - 6, 3); ctx.fillRect(x + 3, y + h - 3, w - 6, 3);
+  ctx.fillRect(x, y + 3, 3, h - 6); ctx.fillRect(x + w - 3, y + 3, 3, h - 6);
+  ctx.fillStyle = 'rgba(120,160,255,0.18)'; ctx.fillRect(x + 3, y + 3, w - 6, 3);
+}
+function blockBar(x, y, n, frac, col, hi) {
+  const lit = Math.ceil(clamp(frac, 0, 1) * n - 1e-6);
+  for (let i = 0; i < n; i++) {
+    const bx = x + i * 21;
+    if (i < lit) { ctx.fillStyle = col; ctx.fillRect(bx, y, 18, 15); ctx.fillStyle = hi; ctx.fillRect(bx, y, 18, 3); }
+    else { ctx.fillStyle = '#1a2350'; ctx.fillRect(bx, y, 18, 15); }
+  }
+}
+function drawHUD() {
+  const low = game.timer < 15, blink = Math.floor(clock * 4) & 1;
+  if (low && blink) { // blinking red frame under 15 s
+    ctx.fillStyle = '#ff4048';
+    ctx.fillRect(0, 0, W, 6); ctx.fillRect(0, H - 6, W, 6); ctx.fillRect(0, 0, 6, H); ctx.fillRect(W - 6, 0, 6, H);
+  }
+  // Earth health
+  pbox(12, 12, 237, 66);
+  ptext('EARTH', 27, 24, 16, '#9fb6e8');
+  const hc = game.hull > 60 ? ['#46ff8c', '#b8ffd4'] : game.hull > 30 ? ['#ffb03b', '#ffe0a0'] : ['#ff4048', '#ffb0b4'];
+  blockBar(27, 48, 10, game.hull / HULL_MAX, hc[0], hc[1]);
+  // fuel
+  pbox(W - 249, 12, 237, 66);
+  ptext('FUEL', W - 27, 24, 16, '#9fb6e8', 'right');
+  blockBar(W - 234, 48, 10, game.fuel / FUEL_MAX, '#ffb03b', '#ffe0a0');
+  // timer
+  pbox(CX - 117, 12, 234, 92);
+  ptext('T-MINUS', CX, 22, 16, '#8fa0c8', 'center');
+  ptext(Math.max(0, game.timer).toFixed(1), CX, 46, 32, low ? (blink ? '#ff4048' : '#ffb0b4') : '#ffffff', 'center');
+  ctx.fillStyle = '#1a2350'; ctx.fillRect(CX - 99, 86, 198, 6);
+  ctx.fillStyle = low ? '#ff4048' : '#7fe7ff';
+  ctx.fillRect(CX - 99, 86, Math.floor(198 * clamp(game.timer / GAME_TIME, 0, 1) / 6) * 6, 6);
+  // saved / deflects
+  pbox(12, H - 84, 262, 72);
+  ptext('SAVED ' + securedNow() + '/' + totalToSpawn, 27, H - 72, 16, '#dfe9ff');
+  ptext('DEFLECT ' + game.strikes, 27, H - 44, 16, '#ffe27a');
+  // threats
+  const threats = debris.reduce((s, d) => s + (d.danger === 'red' ? 1 : 0), 0);
+  pbox(CX - 117, H - 60, 234, 48);
+  ptext('THREATS ' + threats, CX, H - 44, 16, threats > 2 ? (blink ? '#ff4048' : '#ffb0b4') : '#9fb6e8', 'center');
+  // wave + legend
+  pbox(W - 274, H - 84, 262, 72);
+  ptext('WAVE ' + Math.max(1, game.wave) + '/' + WAVES.length, W - 259, H - 72, 16, '#dfe9ff');
+  let lx = W - 259;
+  for (const [col, label] of [[C.red, 'THREAT'], [C.amber, 'NEAR'], [C.green, 'SAFE']]) {
+    ctx.fillStyle = css(col); ctx.fillRect(lx, H - 42, 9, 9);
+    ptext(label, lx + 14, H - 41, 8, '#8fa0c8');
+    lx += 14 + label.length * 8 + 16;
+  }
+  // wave banner: drops in, blinks out
+  if (game.waveFlash > 0 && !(game.waveFlash < 0.4 && blink)) {
+    const age = 1.6 - game.waveFlash, drop = age < 0.2 ? Math.round((0.2 - age) / 0.2 * 40) : 0;
+    pbox(CX - 171, 124 - drop, 342, 84, '#7fe7ff');
+    ptext('WAVE ' + game.waveFlashN, CX, 138 - drop, 32, '#7fe7ff', 'center');
+    ptext('INCOMING DEBRIS', CX, 182 - drop, 16, '#ffb03b', 'center');
+  }
+}
+function drawFXText() {
+  for (const f of fx) {
+    if (f.type !== 'text') continue;
+    const k = f.t / f.life;
+    if (k > 0.7 && (Math.floor(clock * 10) & 1)) continue;
+    ptext(f.str, f.x, f.y - 30 * k, 16, f.col, 'center');
+  }
+}
+function drawAimText() {
+  if (!locked || !dragPreview) return;
+  const m = hypot(dragDV.x, dragDV.y), pv = dragPreview;
+  if (m > 1) ptext('-' + (m / MAX_DV * MAX_COST).toFixed(0) + ' FUEL', mouse.x + 16, mouse.y - 28, 16, '#ffb03b');
+  if (pv.contact && pv.struck) {
+    const ok = pv.struckDanger !== 'red';
+    ptext(ok ? (pv.struckWasRed ? 'DEFLECT!' : 'HIT') : 'STILL INBOUND', CX + pv.contact.x, CY + pv.contact.y - 30, 8,
+          ok ? '#ffe27a' : '#ff9090', 'center');
+  }
+}
+
+function render() {
+  if (!bg || !earthMap) { ctx.fillStyle = '#05060e'; ctx.fillRect(0, 0, W, H); return; }
+  P.set(bg);
+  drawStars();
+  if (game.state === 'play') drawGuideRings();
+  drawEarth();
+  for (const d of debris) drawTrail(d);
+  for (const d of debris) drawDebris(d);
+  drawPrediction(dragPreview);
+  drawSatellite();
+  drawParticles();
+  drawFXWorld();
+  bctx.putImageData(fb, 0, 0);
+  let ox = 0, oy = 0;
+  if (game.shake > 0) { const m = Math.ceil(game.shake * game.shake * 3); ox = Math.round(rand(-m, m)); oy = Math.round(rand(-m, m)); }
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = '#05060e'; ctx.fillRect(0, 0, W, H);
+  ctx.drawImage(buf, ox * PX, oy * PX, BW * PX, BH * PX);
+  if (game.flash > 0) { // stepped impact flash
+    ctx.fillStyle = 'rgba(255,255,255,' + (game.flash > 0.66 ? 0.6 : game.flash > 0.33 ? 0.35 : 0.15) + ')';
+    ctx.fillRect(0, 0, W, H);
+  }
+  drawFXText();
+  if (game.state === 'play') { drawHUD(); drawAimText(); }
+}
+
+/* ============================================================
+ * §11 Audio — lazy AudioContext, every call guarded
+ * ==========================================================*/
+let AC = null, master = null, droneOn = false;
+function initAudio() {
+  try {
+    if (!AC) {
+      AC = new (window.AudioContext || window.webkitAudioContext)();
+      master = AC.createGain(); master.gain.value = 0.5;
+      master.connect(AC.destination);
+    }
+    if (AC.state === 'suspended') AC.resume();
+    if (!droneOn) { droneOn = true; startDrone(); }
+  } catch (e) { /* audio optional */ }
+}
+function startDrone() {
+  try {
+    const g = AC.createGain(); g.gain.value = 0.045;
+    const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 200;
+    for (const [type, fq] of [['sawtooth', 55], ['triangle', 55.7]]) {
+      const o = AC.createOscillator(); o.type = type; o.frequency.value = fq;
+      o.connect(f); o.start();
+    }
+    f.connect(g); g.connect(master);
+  } catch (e) {}
+}
+function tone(freq, dur, vol, type, when) {
+  try {
+    const t = AC.currentTime + (when || 0);
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = type || 'sine'; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur);
+  } catch (e) {}
+}
+function noiseBurst(dur, vol, f0, f1) {
+  try {
+    const n = AC.createBufferSource();
+    const buf = AC.createBuffer(1, AC.sampleRate * dur, AC.sampleRate);
+    const ch = buf.getChannelData(0);
+    for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+    n.buffer = buf;
+    const bp = AC.createBiquadFilter(); bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(f0, AC.currentTime);
+    bp.frequency.exponentialRampToValueAtTime(Math.max(40, f1), AC.currentTime + dur);
+    const g = AC.createGain();
+    g.gain.setValueAtTime(vol, AC.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + dur);
+    n.connect(bp); bp.connect(g); g.connect(master);
+    n.start();
+  } catch (e) {}
+}
+const sfxWhoosh = k => { if (AC) noiseBurst(0.35, 0.12 + 0.25 * k, 400, 1800); };
+const sfxBoom = () => {
+  if (!AC) return;
+  noiseBurst(0.5, 0.35, 300, 60);
+  try {
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(120, AC.currentTime);
+    o.frequency.exponentialRampToValueAtTime(30, AC.currentTime + 0.45);
+    g.gain.setValueAtTime(0.3, AC.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + 0.5);
+    o.connect(g); g.connect(master); o.start(); o.stop(AC.currentTime + 0.5);
+  } catch (e) {}
+};
+const sfxClank = spd => { if (AC) { noiseBurst(0.12, Math.min(0.3, 0.08 + spd / 600), 2400, 500); tone(rand(260, 340), 0.09, 0.06, 'square'); } };
+const sfxDeflect = () => { if (AC) { tone(660, 0.08, 0.07, 'square'); tone(990, 0.14, 0.07, 'square', 0.08); } };
+const sfxUi = () => { if (AC) tone(880, 0.05, 0.05, 'square'); };
+const sfxChime = () => { if (AC) { tone(880, 0.12, 0.08); tone(1320, 0.18, 0.07, 'sine', 0.08); } };
+const sfxTension = t => { if (AC) tone(500 + (15 - t) * 40, 0.08, 0.06, 'square'); };
+const sfxWin = () => { if (AC) [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.25, 0.1, 'square', i * 0.12)); };
+const sfxLose = () => { if (AC) { tone(220, 0.5, 0.12, 'square'); tone(174, 0.7, 0.12, 'square', 0.3); } };
+
+/* ============================================================
+ * §12 Boot (loading page) + main loop
+ * ==========================================================*/
+const wait = ms => new Promise(r => setTimeout(r, ms));
+let loaded = false, attractAcc = 0;
+function loadFont() {
+  if (!document.fonts || !document.fonts.load) return;
+  return Promise.race([document.fonts.load('16px "Press Start 2P"').catch(() => {}), wait(2500)]);
+}
+async function boot() {
+  refreshScores();
+  const steps = [
+    ['CHARTING STARFIELD', makeStars],
+    ['PAINTING NEBULA', makeNebula],
+    ['GENERATING EARTH', () => { makeEarthMap(); spawnAttract(); }],
+    ['LOADING PIXEL FONT', loadFont],
+    ['CALIBRATING THRUSTERS', () => wait(300)],
+  ];
+  for (let i = 0; i < steps.length; i++) {
+    $('loadMsg').textContent = '> ' + steps[i][0] + '...';
+    await wait(160);
+    await steps[i][1]();
+    $('loadFill').style.width = ((i + 1) / steps.length * 100) + '%';
+  }
+  await wait(250);
+  loaded = true;
+  $('loadBox').classList.add('hidden');
+  $('menuBtns').classList.remove('hidden');
+  if (location.search.indexOf('autostart') >= 0) startGame();
+}
+
+let last = performance.now();
+function frame(now) {
+  requestAnimationFrame(frame);
+  const real = Math.min((now - last) / 1000, 0.1);
+  last = now;
+  const ts = game.state === 'play' ? game.timeScale : 1;
+  clock += real * ts;
+  tickStars(real * ts);
+  if (game.state === 'play') {
+    game.acc += real * game.timeScale;
+    while (game.acc >= DT && game.state === 'play') { update(DT); game.acc -= DT; }
+  } else {
+    if (game.state === 'menu' && loaded) {
+      attractAcc += real;
+      while (attractAcc >= DT) { updateAttract(DT); attractAcc -= DT; }
+    }
+    tickFX(real);
+    if (game.flash > 0) game.flash -= real / 0.3;
+    if (game.shake > 0) game.shake -= real / 0.5;
+  }
+  dragPreview = game.state === 'play' && locked ? simulateDrag(locked, dragDV) : null;
+  if (dragPreview) locked.danger = dragPreview.meDanger;
+  render();
+}
+
+resize();
+show('menu');
+requestAnimationFrame(frame);
+boot();
+</script>
+</body>
+</html>
